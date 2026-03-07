@@ -5,9 +5,8 @@ on:
     branches: [main]
     paths:
       - 'fe-server/**'
-    paths-ignore:
-      - 'fe-server/.env*'
-      - '**.md'
+      - '!fe-server/.env*'
+      - '!**.md'
 
 jobs:
   build-and-push:
