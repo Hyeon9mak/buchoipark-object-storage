@@ -1,0 +1,62 @@
+name: Build and Deploy fe-server to GHCR
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'fe-server/**'
+    paths-ignore:
+      - 'fe-server/.env*'
+      - '**.md'
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract short SHA
+        id: sha
+        run: echo "short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./fe-server
+          push: true
+          build-args: |
+            NEXT_PUBLIC_API_BASE_URL=${{ secrets.NEXT_PUBLIC_API_BASE_URL }}
+          tags: |
+            ghcr.io/hyeon9mak/buchoipark-object-storage:${{ steps.sha.outputs.short }}
+            ghcr.io/hyeon9mak/buchoipark-object-storage:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Update k8s-configs image tag
+        env:
+          K8S_CONFIGS_PAT: ${{ secrets.K8S_CONFIGS_PAT }}
+          SHORT_SHA: ${{ steps.sha.outputs.short }}
+        run: |
+          git clone https://x-access-token:${K8S_CONFIGS_PAT}@github.com/Hyeon9mak/k8s-configs.git
+          cd k8s-configs
+          sed -i "s|ghcr.io/hyeon9mak/buchoipark-object-storage:.*|ghcr.io/hyeon9mak/buchoipark-object-storage:${SHORT_SHA}|" apps/buchoipark-object-storage/deployment.yaml
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add apps/buchoipark-object-storage/deployment.yaml
+          git commit -m "chore: update buchoipark-object-storage image to ${SHORT_SHA}"
+          git push
