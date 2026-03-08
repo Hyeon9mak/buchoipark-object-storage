@@ -1,4 +1,4 @@
-import { api } from "./api";
+import { api, API_BASE_URL } from "./api";
 
 export interface FileEntry {
   type: "FILE";
@@ -16,9 +16,6 @@ export interface FolderEntry {
 }
 
 export type StorageEntry = FileEntry | FolderEntry;
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
 
 export function listFolder(
   userId: string,
